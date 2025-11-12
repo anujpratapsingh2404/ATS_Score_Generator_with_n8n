@@ -1,0 +1,382 @@
+{
+  "name": "My workflow 5",
+  "nodes": [
+    {
+      "parameters": {
+        "inputDataFieldName": "Resume",
+        "name": "={{ $json.Resume.filename }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1ZOv5jSZ2gxJBl5rl8w73DEnZZVCtaYA_",
+          "mode": "list",
+          "cachedResultName": "ATS Score generator",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1ZOv5jSZ2gxJBl5rl8w73DEnZZVCtaYA_"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -32,
+        32
+      ],
+      "id": "43d5a3de-c08a-4afb-9c9c-ffe39e0bb6f9",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "enter your drive oauth2 credential id here",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        192,
+        32
+      ],
+      "id": "7884fffb-e462-4c37-a0df-4313cf4b6cc1",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "enter your drive oauth2 credential id here",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        416,
+        32
+      ],
+      "id": "d6fd8bd8-5009-49ab-b715-b5ae2b0a718b",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Please analyze the following resume text. Generate the overall ATS Score (0-100), extract the name and email, and provide concise, actionable feedback for each improvement area in the requested JSON format.\n\nResume Text:\n{{ $json.text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an Expert Applicant Tracking System (ATS) Parser and Recruiter Analyst. Your function is to extract contact details, calculate a general ATS compliance score (0-100), and provide specific, actionable feedback on key areas.\n\nScoring Criteria (No JD Required):\n1. Format/Parsing (30%): Clean structure, standard sections (no complex tables or graphics).\n2. Content Quality (40%): Presence of quantifiable achievements (metrics/results) over mere duties.\n3. Keywords/Skills (30%): Use of specific, relevant hard and soft skill terms.\n\nImprovement Summary\": take Format/Parsing,  Content Quality and  Keywords/Skills  concise, two-to-three-sentence summary highlighting the top one or two overall areas that need improvement.\n\nYou MUST output a single, complete JSON object. If a field (like email) is not found, return the field with an empty string (\"\") or zero (0) as appropriate."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        640,
+        32
+      ],
+      "id": "4f0ec691-8ccf-4347-b83d-71b932adc44b",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        256
+      ],
+      "id": "96a34d71-78fa-4552-8503-1388bc4efc95",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "enter your oauth2 credential id here",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"resume_name\": \"Extracted Full Name\",\n  \"resume_email\": \"Extracted Email Address\",\n  \"ats_score\": 0,\n  \"improvement_feedback\": {\n    \"format\": \"Feedback on document structure, columns, tables, or non-standard characters that confuse an ATS.\",\n    \"keywords\": \"Feedback on the lack of specific hard/soft skills, or too few relevant industry terms.\",\n    \"content_quality\": \"Feedback on using duties instead of quantified achievements and results.\"\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        848,
+        256
+      ],
+      "id": "a4ebcd71-8e52-4c7d-8654-046f668f936c",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.output.email }}",
+        "subject": "Your ATS Resume Score Results",
+        "message": "=<h2>Hell{{ $json.output.email }}o ,</h2>\n\n<p>Thank you for submitting your resume for ATS analysis. Here are your results:</p>\nYour ATS Score: {{ $json.output.ats_score }}\n\n<h3>💡 Improvement Recommendations:</h3>\n\n<h4>Format & Structure:</h4>\n<p> {{ $json.output.feedback.format_parsing }}   </p>\n\n<h4>Keywords & Skills:</h4>\n<p> {{ $json.output.feedback.content_quality }} </p>\n\n<h4>Content Quality:</h4>\n<p>{{ $json.output.feedback.keywords_skills }}  </p>\n\n<hr>\n<p><em>This analysis was generated automatically. For best results, address the feedback above and resubmit your resume.</em></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        992,
+        32
+      ],
+      "id": "90aad236-c356-4678-8a30-920de2744522",
+      "name": "Send a message",
+      "webhookId": "dbde3af2-b1ce-4cd5-9e37-da2953fe9b9c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "enter your gmail oauth2 credential id here",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "formTitle": "ATS Score generator",
+        "formDescription": "Please upload your resume to check ATS score",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Resume",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".pdf",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        -256,
+        32
+      ],
+      "id": "49e1c291-05e9-466b-9e89-8ed53ea6fa7e",
+      "name": "Resume Submission",
+      "webhookId": "8a09b293-53ec-4c04-b0b6-9079dea679d4"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1CV40wsytsQzcc4ETtMmUeYk0fQCjyec4iXQOwPmsibs",
+          "mode": "list",
+          "cachedResultName": "ATS Score",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1CV40wsytsQzcc4ETtMmUeYk0fQCjyec4iXQOwPmsibs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1CV40wsytsQzcc4ETtMmUeYk0fQCjyec4iXQOwPmsibs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ATS Score": "={{ $('AI Agent').item.json.output.ATS_Score }}",
+            "Applicant Name": "={{ $('AI Agent').item.json.output.name }}",
+            "Improvement Summary": "={{ $('AI Agent').item.json.output.Improvement_Summary }}",
+            "Email Address": "={{ $('AI Agent').item.json.output.email }}"
+          },
+          "matchingColumns": [
+            "Name",
+            "Email",
+            "ATS Score",
+            "Format Feedback",
+            "Keywords Feedback",
+            "Content Feedback",
+            "Submission Date"
+          ],
+          "schema": [
+            {
+              "id": "Applicant Name",
+              "displayName": "Applicant Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email Address",
+              "displayName": "Email Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ATS Score",
+              "displayName": "ATS Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Improvement Summary",
+              "displayName": "Improvement Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        32
+      ],
+      "id": "0845365c-0e9f-419a-b951-050c19e1043d",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "enter your google sheet oauth2 credential id here",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Submission": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d30529d7-1c2a-44c8-8d24-3b719c091071",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5a507c8aab4a372d284d0bb7bbd98fb284dc1aac29755d00295b05e67ec79c37"
+  },
+  "id": "3hjVETG3AuF487AZ",
+  "tags": []
+}
